@@ -1,0 +1,71 @@
+version: "3"
+
+tasks:
+  setup:
+    desc: Install all dependencies (backend + frontend)
+    cmds:
+      - cd backend && uv sync --extra dev
+      - cd frontend && npm install
+
+  backend:run:
+    desc: Run the parser and start the FastAPI server
+    dir: backend
+    cmds:
+      - uv run uvicorn src.api.app:app --reload --port 8000
+
+  frontend:dev:
+    desc: Start the Vite dev server
+    dir: frontend
+    cmds:
+      - npm run dev
+
+  dev:
+    desc: Start backend + frontend in parallel
+    deps:
+      - backend:run
+      - frontend:dev
+
+  parse:
+    desc: Run the PDF parser only (no server), print a summary
+    dir: backend
+    cmds:
+      - |
+        uv run python -c "
+        from pathlib import Path
+        from src.config import AppConfig
+        from src.parsers.pdf_parser import parse_folder, summarize
+        cfg = AppConfig.from_env()
+        results = parse_folder(cfg.pdf_input_dir)
+        print('Summary:', summarize(results))
+        for r in results:
+            print(f'[{r.status:8}] {r.source_file}  missing={r.missing_fields}')
+        "
+
+  test:
+    desc: Run the backend test suite
+    dir: backend
+    cmds:
+      - uv run pytest -v
+
+  lint:
+    desc: Run ruff linter and format checker (backend) + eslint (frontend)
+    cmds:
+      - cd backend && uv run ruff check src/ tests/
+      - cd backend && uv run ruff format --check src/ tests/
+      - cd frontend && npm run lint
+
+  build:frontend:
+    desc: Build frontend and copy artifacts to backend/static
+    cmds:
+      - cd frontend && npm run build
+      - rm -rf backend/static && mkdir -p backend/static
+      - cp -R frontend/dist/. backend/static/
+
+  build:exe:
+    desc: Build bundled executable with PyInstaller
+    deps:
+      - build:frontend
+    dir: backend
+    cmds:
+      - uv sync --extra dev
+      - uv run pyinstaller pyinstaller/pdf-parser.spec
