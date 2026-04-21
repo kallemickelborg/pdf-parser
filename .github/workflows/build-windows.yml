@@ -3,6 +3,8 @@ name: Build Windows Executable
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -17,6 +19,13 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      - name: Workflow revision banner
+        shell: pwsh
+        run: |
+          Write-Host "Workflow revision: npm install (no npm ci)"
+          Write-Host "Ref: $env:GITHUB_REF"
+          Write-Host "SHA: $env:GITHUB_SHA"
+
       - name: Checkout
         uses: actions/checkout@v6
 
